@@ -60,10 +60,10 @@ let MOBILE=(function(){
   try{ const v=localStorage.getItem(MKEY); if(v!==null) return v==='1'; }catch(e){}
   return ('ontouchstart' in window) || navigator.maxTouchPoints>0;
 })();
-const MW=480, MH=752;                      // 모바일 화면 해상도 (세로를 줄여 게임 화면을 키움)
+const MW=640, MH=480;                      // 모바일도 가로. 게임 화면을 꽉 채운다
 function VWid(){ return MOBILE?MW:W; }
 function VHei(){ return MOBILE?MH:H; }
-function gameArea(){ return MOBILE ? {x:0,y:18,w:MW,h:360} : {x:0,y:0,w:W,h:H}; }
+function gameArea(){ return {x:0,y:0,w:VWid(),h:VHei()}; }
 
 function fit(){
   const vw=VWid(), vh=VHei();
@@ -102,31 +102,47 @@ function downHit(){ return hit('KeyS','ArrowDown'); }
 let click=null;
 function clickIn(b){ return click && click.x>b.x && click.x<b.x+b.w && click.y>b.y && click.y<b.y+b.h; }
 
-/* ---------- 모바일 화면 버튼 ---------- */
-const DP={cx:104,cy:578,s:58,g:62};
+/* ---------- 모바일 화면 버튼 (가로 모드 · 화면 위에 반투명하게 겹친다) ---------- */
+const DP={cx:78,cy:378,s:44,g:46};
 const MOB_BTNS=[
-  {key:'ArrowUp',   label:'▲', kind:'r', size:19, x:DP.cx-DP.s/2,      y:DP.cy-DP.g-DP.s/2, w:DP.s, h:DP.s},
-  {key:'ArrowDown', label:'▼', kind:'r', size:19, x:DP.cx-DP.s/2,      y:DP.cy+DP.g-DP.s/2, w:DP.s, h:DP.s},
-  {key:'ArrowLeft', label:'◀', kind:'r', size:19, x:DP.cx-DP.g-DP.s/2, y:DP.cy-DP.s/2,      w:DP.s, h:DP.s},
-  {key:'ArrowRight',label:'▶', kind:'r', size:19, x:DP.cx+DP.g-DP.s/2, y:DP.cy-DP.s/2,      w:DP.s, h:DP.s},
-  {key:'Enter',     label:'확인',   kind:'c', cx:382, cy:578, r:46, big:true},
-  {key:'ShiftLeft', label:'달리기', kind:'c', cx:392, cy:470, r:33},
-  {key:'KeyE',      label:'가방',   kind:'c', cx:300, cy:492, r:30},
-  {key:'KeyM',      label:'소리',   kind:'c', cx:300, cy:664, r:27},
-  {key:'Escape',    label:'메뉴',   kind:'r', size:15, x:14, y:404, w:82, h:30},
+  {key:'ArrowUp',   label:'▲',   kind:'r', size:17, x:DP.cx-DP.s/2,      y:DP.cy-DP.g-DP.s/2, w:DP.s, h:DP.s},
+  {key:'ArrowDown', label:'▼',   kind:'r', size:17, x:DP.cx-DP.s/2,      y:DP.cy+DP.g-DP.s/2, w:DP.s, h:DP.s},
+  {key:'ArrowLeft', label:'◀',   kind:'r', size:17, x:DP.cx-DP.g-DP.s/2, y:DP.cy-DP.s/2,      w:DP.s, h:DP.s},
+  {key:'ArrowRight',label:'▶',   kind:'r', size:17, x:DP.cx+DP.g-DP.s/2, y:DP.cy-DP.s/2,      w:DP.s, h:DP.s},
+  {key:'Enter',     label:'확인',   kind:'c', cx:572, cy:396, r:38, big:true},
+  {key:'ShiftLeft', label:'달리기', kind:'c', cx:572, cy:306, r:26},
+  {key:'KeyE',      label:'가방',   kind:'c', cx:492, cy:358, r:24},
+  {key:'KeyM',      label:'소리',   kind:'c', cx:492, cy:286, r:22},
+  {key:'Escape',    label:'메뉴',   kind:'r', size:13, x:562, y:76, w:66, h:26},
 ];
+/* 상황에 따라 필요한 버튼만 띄운다. 대사 중에는 글자를 가리지 않게 전부 숨긴다 */
+function mobShow(b){
+  const k=b.key;
+  if(k==='Escape'||k==='KeyM') return true;
+  if(G.scene!=='field')
+    return k==='ArrowUp'||k==='ArrowDown'||k==='ArrowLeft'||k==='ArrowRight'||k==='Enter';
+  if(G.inv)          return k==='ArrowUp'||k==='ArrowDown'||k==='Enter';
+  if(G.dlg||G.wait)  return false;
+  return true;
+}
 function inBtn(b,x,y){
   if(b.kind==='c'){ const dx=x-b.cx, dy=y-b.cy; return dx*dx+dy*dy<=b.r*b.r; }
   return x>=b.x&&x<=b.x+b.w&&y>=b.y&&y<=b.y+b.h;
 }
+function onMobBtn(p){
+  if(!MOBILE) return false;
+  for(const b of MOB_BTNS) if(mobShow(b)&&inBtn(b,p.x,p.y)) return true;
+  return false;
+}
 let touchKeys=new Set();
 function applyTouchKeys(pts){
   const now=new Set();
-  for(const p of pts) for(const b of MOB_BTNS) if(inBtn(b,p.x,p.y)) now.add(b.key);
+  for(const p of pts) for(const b of MOB_BTNS) if(mobShow(b)&&inBtn(b,p.x,p.y)) now.add(b.key);
   for(const k of now)       if(!touchKeys.has(k)){ pressed[k]=true; keys[k]=true; }
   for(const k of touchKeys) if(!now.has(k))       { keys[k]=false; }
   touchKeys=now;
 }
+
 function viewPt(clientX,clientY){
   const r=view.getBoundingClientRect();
   return { x:(clientX-r.left)*(VWid()/r.width), y:(clientY-r.top)*(VHei()/r.height) };
@@ -138,6 +154,7 @@ function toGame(p){
   return { x:(p.x-ga.x)*(W/ga.w), y:(p.y-ga.y)*(H/ga.h) };
 }
 function gameTap(p){
+  if(onMobBtn(p)) return false;
   const g=toGame(p);
   if(!g) return false;
   click=g; ptGame=g; return true;
@@ -431,7 +448,16 @@ function spAnt(g,dir,f){
   P(g,6,30-k,1,1,b); P(g,9,30-k,1,1,b); P(g,12,30-k,1,1,b);
   P(g,6,23+k,1,1,b); P(g,9,23+k,1,1,b); P(g,12,23+k,1,1,b);
 }
-const SPRITES={ hancheol:spHancheol, ant:spAnt, jeomsun:spJeomsun, caster:spCaster, announcer:spAnnouncer,
+function spLamp(g,dir,f){
+  const pole='#4a4a54';
+  P(g,7,11,3,20,pole);
+  P(g,5,29,7,2,'#3a3a44');
+  P(g,3,3,12,3,'#5f5f6a');
+  P(g,4,6,10,4,'#6a6a76');
+  P(g,5,10,8,3,f?'#fff0a8':'#e0d060');
+  P(g,6,13,6,2,f?'#e0d060':'#b8a840');
+}
+const SPRITES={ hancheol:spHancheol, ant:spAnt, lamp:spLamp, jeomsun:spJeomsun, caster:spCaster, announcer:spAnnouncer,
                 coach:spCoach, nurse:spNurse, doctor:spDoctor,
                 police:spPolice, clerk:spClerk, rapper:spRapper, thug:spThug, reader:spReader,
                 bird:spBird, tiger:spTiger, yeongcheol:spYeongcheol, dog:spDog, wasp:spWasp };
@@ -541,6 +567,7 @@ const PERSONS={
   punkB :{skin:'#e8b88c',hair:'#141018',style:'cap', top:'#3a3a48',pants:'#22283a',capC:'#e0c060'},
   // 시골촌 가는 길
   homele:{skin:'#c89a70',hair:'#5a4a38',style:'long', top:'#6a5f4a',pants:'#4a4238',acc:'scarf',accC:'#8a7a5a'},
+  monk  :{skin:'#e8c49c',hair:'#3a2a1a',style:'bald', top:'#9a7a4a',pants:'#8a6a3e',acc:'scarf',accC:'#b0502a'},
   boss  :{skin:'#e8b88c',hair:'#5a5a64',style:'short',top:'#3a4a6e',pants:'#2a2f42',acc:'tie',accC:'#8a2a3a'},
   beggar:{skin:'#c89a70',hair:'#4a3a2a',style:'afro', top:'#5a5044',pants:'#463c30',acc:'scarf',accC:'#7a6a52'},
   secr  :{skin:'#f0c49c',hair:'#141018',style:'short',top:'#1b1b28',pants:'#1b1b28',acc:'glasses'},
@@ -693,8 +720,37 @@ function snapshot(){
            gold:p.gold, immune:p.immune, good:p.good, swag:p.swag, cute:p.cute, fashion:p.fashion, power:p.power, link:p.link, idol:p.idol, zen:p.zen, items:Object.assign({},G.items),
            flags:Object.assign({},G.flags), play:G.playTime, time:Date.now() };
 }
-function saveGame(silent){ const ok=lsSet(SKEY,snapshot()); if(ok&&!silent) toast('저장되었습니다'); return ok; }
-function readSave(){ const s=lsGet(SKEY); return (s&&ROOMS[s.room])?s:null; }
+/* ---------- 세이브 슬롯 4개 ---------- */
+const SLOTS=4;
+const SLOTKEY=(i)=>'ganggang_slot_v1_'+i;
+const CURKEY='ganggang_slot_cur';
+let CUR_SLOT=(function(){
+  const v=parseInt(lsGet(CURKEY),10);
+  return (v>=0&&v<SLOTS)?v:0;
+})();
+function setSlot(i){ CUR_SLOT=clamp(i|0,0,SLOTS-1); lsSet(CURKEY,CUR_SLOT); }
+function readSlot(i){ const s=lsGet(SLOTKEY(i)); return (s&&ROOMS[s.room])?s:null; }
+function slotCount(){ let n=0; for(let i=0;i<SLOTS;i++) if(readSlot(i)) n++; return n; }
+/* 예전 단일 세이브가 있으면 1번 칸으로 옮겨온다 */
+(function migrateSave(){
+  try{
+    if(localStorage.getItem('ganggang_migrated_v1')) return;
+    const old=lsGet(SKEY);
+    if(old&&!lsGet(SLOTKEY(0))) lsSet(SLOTKEY(0),old);
+    localStorage.setItem('ganggang_migrated_v1','1');
+  }catch(e){}
+})();
+function saveGame(silent,slot){
+  const i=(slot===undefined)?CUR_SLOT:slot;
+  const ok=lsSet(SLOTKEY(i),snapshot());
+  if(ok){ setSlot(i); if(!silent) toast((i+1)+'번 칸에 저장되었습니다'); }
+  return ok;
+}
+function readSave(){
+  const cur=readSlot(CUR_SLOT); if(cur) return cur;
+  for(let i=0;i<SLOTS;i++){ const v=readSlot(i); if(v){ setSlot(i); return v; } }
+  return null;
+}
 function applySave(s){
   const p=G.player;
   p.hp=s.hp; p.maxhp=s.maxhp; p.atk=s.atk; p.hair=s.hair; p.gold=s.gold;
@@ -847,8 +903,8 @@ const PORTRAIT={ '한철':'hancheol','점순이':'jeomsun','중계진':'caster',
                  '사기꾼':'swindl','사이비 신도':'cultis',
                  '말벌':'wasp','점순':'jeomsun',
                  '노숙자':'homele','GS26 사장':'homele',
-                 '개미':'ant','김부장':'boss','거지':'beggar','거지?':'beggar',
-                 '회장':'beggar','김비서':'secr','가로등':'vil7' };
+                 '지나가던 스님':'monk','개미':'ant','김부장':'boss','거지':'beggar','거지?':'beggar',
+                 '회장':'beggar','김비서':'secr','가로등':'lamp' };
 
 /* =========================================================================
    이름 입력창 : 한글 IME 때문에 캔버스가 아니라 진짜 <input> 을 띄운다
@@ -1199,17 +1255,24 @@ const INFRA=[
 const INFRA_W=280, INFRA_TOP=60, INFRA_H=220, ROAD_Y=330, ROAD_H=100;
 const VILLAGE_W=2860;
 const BR_X=800;                 // 육교 중심 (경찰서 ~ 옷가게 사이)
+/* 도로 가변 벤치 — 가로등 사이에 하나씩, 육교 밑은 비운다 */
+const BENCH_W=84, BENCH_Y=ROAD_Y+ROAD_H+8;
+const BENCHES=(function(){
+  const b=[];
+  for(let x=350;x<VILLAGE_W-140;x+=380) if(Math.abs(x+BENCH_W/2-BR_X)>=130) b.push(x);
+  return b;
+})();
 
 /* 육교 상판 : 인물보다 앞에 그려서 한철이 다리 밑을 지나가게 보인다 */
 function overVillage(){
-  rect(BR_X-64,0,128,H,'#8a8a94');
-  for(let y=6;y<H;y+=22) rect(BR_X-58,y,116,3,'#75757f');
-  for(const rx of [BR_X-76,BR_X+64]){
-    rect(rx,0,12,H,'#c0c4cc');
-    for(let y=4;y<H;y+=16) rect(rx+2,y,8,9,'#969aa4');
+  rect(BR_X-46,0,92,H,'#8a8a94');
+  for(let y=6;y<H;y+=22) rect(BR_X-40,y,80,3,'#75757f');
+  for(const rx of [BR_X-56,BR_X+46]){
+    rect(rx,0,10,H,'#c0c4cc');
+    for(let y=4;y<H;y+=16) rect(rx+2,y,6,9,'#969aa4');
   }
-  rect(BR_X-48,ROAD_Y+28,96,26,'#3a3a46'); frameR(BR_X-48,ROAD_Y+28,96,26,'#20202a',2);
-  text('육 교',BR_X,ROAD_Y+34,13,'#e0e4ec','center','bold');
+  rect(BR_X-38,ROAD_Y+30,76,22,'#3a3a46'); frameR(BR_X-38,ROAD_Y+30,76,22,'#20202a',2);
+  text('육 교',BR_X,ROAD_Y+34,12,'#e0e4ec','center','bold');
 }
 
 function bgVillage(){
@@ -1244,10 +1307,35 @@ function bgVillage(){
   rect(336,26,128,30,'#1f5a4a'); frameR(336,26,128,30,'#14392f',3);
   text('은행 · 미용실 ↑',400,34,12,'#e8f4ee','center','bold');
   // 육교 (경찰서 ~ 옷가게 사이) — 기둥과 그림자는 바닥에, 상판은 overVillage() 에서
-  rect(BR_X-58,ROAD_Y+ROAD_H-4,16,46,'#6a6a74'); rect(BR_X+42,ROAD_Y+ROAD_H-4,16,46,'#6a6a74');
-  rect(BR_X-58,INFRA_TOP+INFRA_H+8,16,46,'#6a6a74'); rect(BR_X+42,INFRA_TOP+INFRA_H+8,16,46,'#6a6a74');
-  ctx.globalAlpha=.30; rect(BR_X-84,ROAD_Y,168,ROAD_H,'#000'); ctx.globalAlpha=1;
+  rect(BR_X-44,ROAD_Y+ROAD_H-4,14,46,'#6a6a74'); rect(BR_X+30,ROAD_Y+ROAD_H-4,14,46,'#6a6a74');
+  rect(BR_X-44,INFRA_TOP+INFRA_H+8,14,46,'#6a6a74'); rect(BR_X+30,INFRA_TOP+INFRA_H+8,14,46,'#6a6a74');
+  ctx.globalAlpha=.30; rect(BR_X-62,ROAD_Y,124,ROAD_H,'#000'); ctx.globalAlpha=1;
   text('올라갈 수 없다',BR_X,ROAD_Y+ROAD_H+16,11,'#7a8a80','center');
+  // 주차된 자동차 (placeVillagers 가 잡아준 자리에)
+  {
+    const car=ROOMS.village&&ROOMS.village.objs.find(o=>o.name==='주차된 자동차');
+    if(car){
+      const cx0=car.x, cy0=car.y;
+      ctx.globalAlpha=.28; rect(cx0+4,cy0+34,90,8,'#000'); ctx.globalAlpha=1;
+      rect(cx0,cy0+14,96,20,'#c0392b');
+      rect(cx0+10,cy0+2,62,14,'#a93226');
+      rect(cx0+16,cy0+5,20,9,'#9ad0e8'); rect(cx0+42,cy0+5,24,9,'#9ad0e8');
+      rect(cx0,cy0+30,96,5,'#7b241c');
+      rect(cx0+12,cy0+33,16,7,'#16161c'); rect(cx0+66,cy0+33,16,7,'#16161c');
+      rect(cx0+14,cy0+35,12,3,'#3a3a44'); rect(cx0+68,cy0+35,12,3,'#3a3a44');
+      rect(cx0+90,cy0+18,6,6,'#f0e0a0'); rect(cx0,cy0+18,5,5,'#e05a4a');
+      text('주차된 자동차',cx0+48,cy0+44,10,'#8a9a90','center');
+    }
+  }
+  // 벤치
+  for(const bx of BENCHES){
+    ctx.globalAlpha=.25; rect(bx+4,BENCH_Y+30,BENCH_W-8,6,'#000'); ctx.globalAlpha=1;
+    rect(bx,BENCH_Y+2,BENCH_W,7,'#9a7a50');
+    rect(bx,BENCH_Y+12,BENCH_W,9,'#8a6a44');
+    rect(bx,BENCH_Y+21,BENCH_W,3,'#6a5030');
+    rect(bx+6,BENCH_Y+24,8,10,'#5a4630'); rect(bx+BENCH_W-14,BENCH_Y+24,8,10,'#5a4630');
+    rect(bx+2,BENCH_Y-2,4,16,'#6a5030'); rect(bx+BENCH_W-6,BENCH_Y-2,4,16,'#6a5030');
+  }
   // 가로등
   for(let x=200;x<VILLAGE_W;x+=380){
     rect(x,ROAD_Y+ROAD_H+6,6,40,'#3a3a44'); rect(x-8,ROAD_Y+ROAD_H,22,10,'#e0d060');
@@ -2393,11 +2481,63 @@ const CKEY='ganggang_chapter_v1';
 /* 개발자 모드에서는 모든 챕터 세이브가 열려 있다 */
 function chapterUnlocked(){ if(SET.dev) return true; try{ return localStorage.getItem(CKEY)==='1'; }catch(e){ return false; } }
 function unlockChapter(){ try{ localStorage.setItem(CKEY,'1'); }catch(e){} }
-/* 챕터 3 (둘째날 낮) 세이브 */
+/* 둘째날 낮 세이브 */
 const CKEY2='ganggang_chapter2_v1';
 function chapter2Unlocked(){ if(SET.dev) return true; try{ return localStorage.getItem(CKEY2)==='1'; }catch(e){ return false; } }
 function unlockChapter2(){ try{ localStorage.setItem(CKEY2,'1'); }catch(e){} }
 /* 둘째날 낮, 점순이가 사라진 상태로 집 앞에서 시작한다 */
+/* 깊은 산 세이브 — 실제로 깊은 산에 올라가 봐야 열린다 */
+const CKEY3='ganggang_chapter3_v1';
+function chapter3Unlocked(){ if(SET.dev) return true; try{ return localStorage.getItem(CKEY3)==='1'; }catch(e){ return false; } }
+function unlockChapter3(){ try{ localStorage.setItem(CKEY3,'1'); }catch(e){} }
+/* 단서를 다 모으고 산 깊은 곳까지 올라온 상태 */
+function startChapterDeep(){
+  resetGame();
+  const p=G.player;
+  p.maxhp=1; p.hp=1; p.power=1;
+  G.flags.opening=true; G.flags.outside=true;
+  G.flags.pcPlays=3; G.flags.pcOff=true;
+  G.flags.night=false; G.flags.day2=true; G.flags.slept=true;
+  G.flags.gotCard=true; G.flags.gotShovel=true; G.flags.gotGun=true;
+  G.flags.porridgeSeen=true; G.flags.ch3=true;
+  G.flags.clue_dad=true; G.flags.clue_cop=true; G.flags.clue_jail=true;
+  G.flags.tigerGone=true; G.flags.sawDeep=true;
+  G.items={ card:1, shovel:1, gun:1, note:1 };
+  G.cut.tv=true;
+  G.scene='field';
+  enterRoom('deep',320,430);
+  setTimeout(()=>say([
+    ['sys','둘째날 — 산 깊은 곳'],
+    ['한철','단서는 다 모았고'],
+    ['한철','밭에 대고 불러보자'],
+  ]),400);
+}
+/* HC바이오 뒷문 세이브 — 키카드를 주워야 열린다 */
+const CKEY4='ganggang_chapter4_v1';
+function unlockChapter4(){ try{ localStorage.setItem(CKEY4,'1'); }catch(e){} }
+function startChapterBack(){
+  resetGame();
+  const p=G.player;
+  p.maxhp=1; p.hp=1; p.power=1; p.good=2;
+  G.flags.opening=true; G.flags.outside=true;
+  G.flags.pcPlays=3; G.flags.pcOff=true;
+  G.flags.night=false; G.flags.day2=true; G.flags.slept=true;
+  G.flags.gotCard=true; G.flags.gotShovel=true; G.flags.gotGun=true;
+  G.flags.porridgeSeen=true; G.flags.ch3=true;
+  G.flags.clue_dad=true; G.flags.clue_cop=true; G.flags.clue_jail=true;
+  G.flags.tigerGone=true; G.flags.sawDeep=true; G.flags.foundJeom=true;
+  G.flags.cultPass=true; G.flags.punkDone=true; G.flags.punkGone=true;
+  G.flags.gotKeycard=true; G.flags.beggarDone=true; G.flags.bossMet=true;
+  G.items={ card:1, shovel:1, gun:1, note:1, card2:1, keycard:1 };
+  G.cut.tv=true;
+  G.scene='field';
+  enterRoom('hcback',60,236);
+  setTimeout(()=>say([
+    ['sys','둘째날 — HC바이오 뒷문'],
+    ['한철','키카드는 챙겼고'],
+    ['한철','정문으로 돌아가볼까'],
+  ]),400);
+}
 function startChapterDay2(){
   resetGame();
   const p=G.player;
@@ -2442,6 +2582,8 @@ function startChapterMotel(){
 const CHAPTERS=[
   {no:1,name:'첫째날 밤',where:'모텔 앞 · 열 39도',        key:CKEY, start:startChapterMotel},
   {no:2,name:'둘째날 낮',where:'집 앞 · 점순이가 사라졌다', key:CKEY2,start:startChapterDay2},
+  {no:3,name:'깊은 산',  where:'산 깊은 곳 · 텃밭 앞',      key:CKEY3,start:startChapterDeep},
+  {no:4,name:'HC바이오', where:'뒷문 · 키카드를 주운 뒤',     key:CKEY4,start:startChapterBack},
 ];
 function chapterOpen(c){ if(SET.dev) return true; try{ return localStorage.getItem(c.key)==='1'; }catch(e){ return false; } }
 function anyChapterOpen(){ return CHAPTERS.some(chapterOpen); }
@@ -3172,11 +3314,29 @@ function posKill(pre){
 
 function policeCounter(){
   const opts=[{label:'과태료 납부',fn:policeFine}];
+  if(G.flags.shovelSeized&&!has('shovel')) opts.splice(0,0,{label:'압수품 찾기',fn:shovelBack});
   if(ch3()&&!gotClue('cop')) opts.splice(0,0,{label:'실종신고',fn:missingReport});
   opts.push({label:'안녕히계세요',fn:()=>say([['경찰','또 볼일 없었으면 좋겠습니다']])});
   say([
     ['경찰','네 무슨일로 오셨나요?'],
     ['한철','',{choice:opts}],
+  ]);
+}
+/* 철창에서 나온 뒤 압수당한 삽을 되찾는다 */
+function shovelBack(){
+  say([
+    ['한철','아까 압수당한 삽 좀 주세요'],
+    ['경찰','아 그 삽이요'],
+    ['경찰','...'],
+    ['경찰','근데 또 땅 파러 가시는건 아니죠?'],
+    ['한철','아니에요'],
+    ['경찰','진짜죠?'],
+    ['한철','네'],
+    ['경찰','그럼 가져가세요'],
+    ['sys','삽을 돌려받았다',
+     {fn:()=>{ give('shovel'); G.flags.shovelSeized=false; SFX.get(); saveGame(true); }}],
+    ['경찰','다음엔 들고 오지 마세요'],
+    ['한철','넵'],
   ]);
 }
 function policeFine(){
@@ -3185,7 +3345,7 @@ function policeFine(){
       ['경찰','그 삽은 뭔가요?'],
       ['한철','땅좀 팔려고요'],
       ['경찰','이새끼 잡아',{shake:0.5}],
-      ['sys','삽을 압수당했다',{fn:()=>takeItem('shovel')}],
+      ['sys','삽을 압수당했다',{fn:()=>{ takeItem('shovel'); G.flags.shovelSeized=true; }}],
     ],()=>goJail('shovel'));
     return;
   }
@@ -4095,7 +4255,7 @@ function hcBackKey(){
     say([['한철','아까 키카드를 주운 자리다.'],['한철','더 없나']]);
     return;
   }
-  G.flags.gotKeycard=true; give('keycard');
+  G.flags.gotKeycard=true; give('keycard'); unlockChapter4();
   say([
     ['한철','(바닥에 뭐가 떨어져있다.)'],
     ['sys','키카드를 획득했다'],
@@ -4235,16 +4395,387 @@ function springBowl(){
 }
 
 /* =========================================================================
+   마을 주민들 — 대부분 쓸모없는 말을 한다
+   TOWN 에 한 줄 추가하면 새 주민이 생긴다 (kind 는 vil* 중 하나)
+   lines = 처음 만났을 때,  more = 두 번째,  그 다음부터는 TOWN_IDLE
+   always:true 는 이야기에 걸린 주민이라 항상 나온다
+   ========================================================================= */
+const TOWN=[
+  {id:'t_bench',kind:'vil11', name:'벤치에 앉은 주민', bench:true, always:true, lines:()=>[
+    ['한철','앉아도 돼요?'],
+    ['주민','애인있어요'],
+    ['한철','죄송합니다'],
+  ], more:()=>[
+    ['한철','저기'],
+    ['주민','애인있다니까요'],
+    ['한철','아직 아무 말도 안 했는데요'],
+    ['주민','할 것 같아서요'],
+  ]},
+  {id:'t_cold', kind:'vil10', name:'떨고있는 주민', always:true, lines:()=>[
+    ['한철','왜그렇게 떨고 계세요?'],
+    ['주민','추...추워'],
+    ['한철','지금 8월인데요.'],
+    ['한철','감기걸리셨으면 병원 가보시죠'],
+    ['주민','저.. 노친네를 조심해...'],
+    ['주민','아재개그를 세번 이상 들으면 진짜로 얼어죽을지도 몰라..'],
+    ['한철','그럼 몸좀 녹이고 계세요..'],
+    ['주민','그래..'],
+  ], more:()=>[
+    ['주민','아직도 추워'],
+    ['한철','그 아저씨 개그 들으셨어요?'],
+    ['주민','여섯 번'],
+    ['한철','여섯 번이요?'],
+    ['주민','세 번 듣고 도망쳤는데 따라오더라'],
+    ['한철','...'],
+    ['주민','너도 도망쳐'],
+  ]},
+  {id:'t_miss', kind:'vil2',  name:'수군대는 주민', always:true, lines:()=>[
+    ['주민','실종자를 찾습니다'],
+    ['한철','실종자요?'],
+    ['주민','어느 회사원의 딸이 실종되었대요'],
+    ['주민','암살당한건가..'],
+    ['한철','암살이요?'],
+    ['주민','이 동네에 살인마 살고 있잖아요'],
+    ['주민','그쪽도 조심해요. 경찰도 지금 수를 못쓰고 있으니께'],
+    ['한철','(치안이 그리 좋지 않은 마을인것 같다)'],
+  ], more:()=>[
+    ['주민','아 그 실종자 말인데요'],
+    ['한철','네'],
+    ['주민','사실 저도 잘 몰라요'],
+    ['한철','아까는 아는 것처럼 말하셨는데'],
+    ['주민','그게 더 재밌잖아요'],
+    ['한철','...'],
+  ]},
+  {id:'t_river',kind:'vil14', name:'강가 얘기하는 주민', always:true, lines:()=>[
+    ['주민','강가쪽에서 요근래 실종되었다는 사람을 본사람들이 있더라고요'],
+    ['한철','살아있는 상태였나요?'],
+    ['주민','그야 모르죠'],
+    ['한철','...'],
+    ['주민','아 무섭게 왜 쳐다봐요'],
+  ], more:()=>[
+    ['주민','강가 가보셨어요?'],
+    ['한철','아직이요'],
+    ['주민','가지 마세요'],
+    ['한철','왜요'],
+    ['주민','거기 사기꾼 있어요'],
+    ['한철','그건 진작 말해주시죠'],
+    ['주민','안 물어보셨잖아요'],
+  ]},
+  {id:'t_bored',kind:'vil13', name:'심심한 주민', lines:()=>[
+    ['주민','아 심심해'],
+    ['한철','네'],
+    ['주민','심심한 것에 대한 심심한 사과를 드립니다'],
+    ['한철','사과는 안 하셨는데요'],
+    ['주민','심심해서요'],
+  ], more:()=>[
+    ['주민','아직도 심심해'],
+    ['한철','취미를 가져보세요'],
+    ['주민','취미가 심심해하기예요'],
+    ['한철','그럼 지금 즐거우시겠네요'],
+    ['주민','어 그러네'],
+    ['주민','고마워요'],
+  ]},
+  {id:'t_poop', kind:'vil4',  name:'급한 주민', lines:()=>[
+    ['주민','똥마렵다'],
+    ['한철','NPC들이 주는 정보 꼬라지가 보법이 다르네'],
+    ['주민','물구나무를 서서 걸으면 코어근육에 힘을줘야되니까'],
+    ['주민','급똥을 참을수 있지 않을까'],
+    ['한철','진짜 보법이 다르네'],
+    ['주민','한번 해보시던가'],
+    ['한철','안 할래요'],
+  ], more:()=>[
+    ['주민','해결했어요'],
+    ['한철','축하드려요'],
+    ['주민','물구나무 서서 갔어요'],
+    ['한철','진짜로요?'],
+    ['주민','아뇨 그냥 걸어갔어요'],
+  ]},
+  {id:'t_9su',  kind:'vil8',  name:'김주민', lines:()=>[
+    ['주민','내이름은 김주민'],
+    ['주민','올해로 9수다'],
+    ['한철','힘내세요'],
+    ['주민','고맙다'],
+    ['주민','근데 니가 뭔데 힘내라 마라야'],
+    ['한철','죄송합니다'],
+  ], more:()=>[
+    ['주민','나 10수 될 것 같다'],
+    ['한철','아직 시험 안 봤잖아요'],
+    ['주민','느낌이 그래'],
+    ['한철','...'],
+    ['주민','느낌은 늘 맞더라'],
+  ]},
+  {id:'t_potato',kind:'vil6', name:'감자 아는 주민', lines:()=>[
+    ['한철','혹시 전설의 감자 아세요?'],
+    ['주민','알죠'],
+    ['한철','진짜요?!'],
+    ['주민','전설이잖아요'],
+    ['주민','전설은 다들 알죠'],
+    ['한철','...'],
+    ['주민','어디 있는지는 몰라요'],
+  ], more:()=>[
+    ['한철','감자 어디 있는지 진짜 모르세요?'],
+    ['주민','몰라요'],
+    ['주민','근데 산에 밭이 있다는 얘기는 들었어요'],
+    ['한철','그거 중요한 정보 아니에요?'],
+    ['주민','아까 안 물어보셨잖아요'],
+    ['한철','아까 물어봤는데요'],
+  ]},
+  {id:'t_diet', kind:'vil11', name:'다이어트 하는 주민', lines:()=>[
+    ['주민','저 오늘부터 다이어트해요'],
+    ['한철','오 대단하시네요'],
+    ['주민','내일부터요'],
+    ['한철','네'],
+    ['주민','사실 모레부터요'],
+  ], more:()=>[
+    ['주민','다이어트 시작했어요'],
+    ['한철','오'],
+    ['주민','어제부터요'],
+    ['한철','어제는 내일부터라면서요'],
+    ['주민','그게 어제였잖아요'],
+    ['한철','어..'],
+  ]},
+  {id:'t_lotto',kind:'vil5',  name:'로또 사는 주민', lines:()=>[
+    ['주민','이번 주엔 진짜 될 것 같아요'],
+    ['한철','몇 년째세요?'],
+    ['주민','12년이요'],
+    ['한철','...'],
+    ['주민','그래서 확률이 쌓였잖아요'],
+    ['한철','그렇게 되는 게 아닌데'],
+  ], more:()=>[
+    ['주민','이번에도 안 됐어요'],
+    ['한철','힘내세요'],
+    ['주민','근데 5000원 됐어요'],
+    ['한철','오 잘됐네요'],
+    ['주민','만원어치 샀거든요'],
+    ['한철','...'],
+  ]},
+  {id:'t_dog',  kind:'vil3',  name:'개 산책시키는 주민', lines:()=>[
+    ['주민','우리 개가 오늘따라 안 걸어요'],
+    ['한철','개가 안 보이는데요'],
+    ['주민','그러니까요'],
+    ['한철','네?'],
+    ['주민','어디 갔지'],
+  ], more:()=>[
+    ['주민','개 찾았어요'],
+    ['한철','어디 있었어요?'],
+    ['주민','집에요'],
+    ['한철','산책을 안 데리고 나오셨네요'],
+    ['주민','그러네'],
+  ]},
+  {id:'t_pizza',kind:'vil9',  name:'배달 기다리는 주민', lines:()=>[
+    ['주민','피자 시킨 지 두 시간 됐어요'],
+    ['한철','전화해보시죠'],
+    ['주민','했어요'],
+    ['한철','뭐래요'],
+    ['주민','출발했대요'],
+    ['주민','두 시간 전에도 출발했대요'],
+  ], more:()=>[
+    ['주민','피자 왔어요'],
+    ['한철','다행이네요'],
+    ['주민','근데 제가 시킨 게 아니래요'],
+    ['한철','그럼요?'],
+    ['주민','옆집 거래요'],
+    ['주민','근데 이미 먹었어요'],
+  ]},
+  {id:'t_gym',  kind:'vil15', name:'헬스장 다니는 주민', lines:()=>[
+    ['주민','저 헬스장 1년 끊었어요'],
+    ['한철','몇 번 가셨어요?'],
+    ['주민','한 번이요'],
+    ['한철','언제요'],
+    ['주민','끊는 날'],
+  ], more:()=>[
+    ['주민','저 오늘 헬스장 갔어요'],
+    ['한철','오 두 번째네요'],
+    ['주민','아뇨'],
+    ['주민','환불하러요'],
+    ['한철','...'],
+  ]},
+  {id:'t_ghost',kind:'vil12', name:'무서운 얘기 하는 주민', lines:()=>[
+    ['주민','저 산에 귀신 나온대요'],
+    ['한철','호랑이 아니고요?'],
+    ['주민','호랑이도 나오고 귀신도 나와요'],
+    ['한철','뭐가 더 무서워요'],
+    ['주민','호랑이요. 귀신은 안 물잖아요'],
+  ], more:()=>[
+    ['주민','어제 산에서 뭘 봤어요'],
+    ['한철','귀신이요?'],
+    ['주민','아뇨 여자애가 밭을 파고 있던데'],
+    ['한철','(점순이인가)'],
+    ['주민','그게 더 무섭더라고요'],
+    ['한철','왜요'],
+    ['주민','새벽 네시였거든요'],
+  ]},
+  {id:'t_wifi', kind:'vil16', name:'와이파이 찾는 주민', lines:()=>[
+    ['주민','여기 와이파이 되나요'],
+    ['한철','저한테 물어보시면'],
+    ['주민','아 죄송'],
+    ['주민','근데 여기 게임 속이잖아요'],
+    ['한철','아세요?'],
+    ['주민','다 알죠'],
+    ['한철','?'],
+  ], more:()=>[
+    ['주민','와이파이 찾았어요'],
+    ['한철','어디서요'],
+    ['주민','제작자님이 열어주셨어요'],
+    ['한철','네?'],
+    ['주민','통뇌교 아세요?'],
+    ['한철','아 됐어요'],
+  ]},
+  {id:'t_hair', kind:'vil1',  name:'머리 걱정하는 주민', lines:()=>[
+    ['주민','저기 미용실 가보셨어요?'],
+    ['한철','아직이요'],
+    ['주민','가지 마세요'],
+    ['한철','왜요'],
+    ['주민','제 머리 보세요'],
+    ['한철','(모자를 쓰고 계신다)'],
+  ], more:()=>[
+    ['한철','그 모자 안 벗으세요?'],
+    ['주민','네'],
+    ['한철','왜요'],
+    ['주민','벗으면 슬퍼져서요'],
+    ['한철','죄송합니다'],
+  ]},
+];
+/* 할 말 다 한 주민에게 또 말을 걸면 이 중 하나가 무작위로 */
+const TOWN_IDLE=[
+  [['한철','안녕하세요'],['주민','안녕하세요'],['한철','...'],
+   ['한철','꿀팁같은거 안주시나요'],['주민','내가 왜 꿀팁을 줘야되는데']],
+  [['주민','또 오셨네'],['한철','네'],['주민','할 일 없으세요?'],
+   ['한철','감자 찾는 중인데요'],['주민','그게 할 일 없는 거예요']],
+  [['한철','안녕하세요'],['주민','네'],['한철','...'],['주민','...'],['한철','그럼 이만']],
+  [['주민','뭐 필요하세요?'],['한철','아니요'],['주민','그럼 왜 말 거세요'],['한철','죄송합니다']],
+  [['한철','혹시 하실 말씀 더 없으세요?'],['주민','아까 다 했는데요'],['한철','아 네'],
+   ['주민','더 듣고 싶으면 돈을 내던가'],['한철','됐어요']],
+  [['주민','저기요'],['한철','네?'],['주민','아니 말 걸길래'],
+   ['한철','제가 걸었는데요'],['주민','아 그런가']],
+  [['한철','오늘 날씨 좋네요'],['주민','8월인데요'],['한철','그니까요'],['주민','안 좋아요']],
+];
+function townTalk(t){
+  const k='town_'+t.id, n=G.flags[k]||0;
+  G.flags[k]=n+1;
+  if(n===0){ say(t.lines()); return; }
+  if(n===1&&t.more){ say(t.more()); return; }
+  say(TOWN_IDLE[rint(0,TOWN_IDLE.length-1)]);
+}
+/* 한 번에 다 나오면 길이 북적여서, 이야기에 걸린 주민 말고는 일부만 내보낸다 */
+const TOWN_SHOW=7;
+function pickTownOut(){
+  const must=TOWN.filter(t=>t.always).map(t=>t.id);
+  const rest=TOWN.filter(t=>!t.always).map(t=>t.id);
+  for(let i=rest.length-1;i>0;i--){ const j=rint(0,i); const v=rest[i]; rest[i]=rest[j]; rest[j]=v; }
+  G.townOut=must.concat(rest.slice(0,TOWN_SHOW));
+}
+function townHere(id){ return !G.townOut || G.townOut.indexOf(id)>=0; }
+
+/* =========================================================================
+   김부장과 민지 — 아재개그를 다섯 번 들으면 진짜 이야기를 꺼낸다
+   ========================================================================= */
+function bossReveal(){
+  say([
+    ['김부장','재밌지 그치'],
+    ['한철','와정말재밌어요'],
+    ['김부장','그럼 그럼.'],
+    ['김부장','아무튼 내 개그를 들어줘서 고맙다'],
+    ['한철','천만에요'],
+    ['김부장','그나저나 우리 민지좀 찾아주겠니'],
+    ['한철','그거 다른 세계관이라니까요'],
+    ['김부장','아니 진짜로'],
+    ['김부장','실은 우리 딸이 진짜로 실종되었는데'],
+    ['김부장','별로 너가 관심없어할거같아서 구체적으로 말 안한거다'],
+    ['한철','따님 이름이..'],
+    ['김부장','민지'],
+    ['한철','어이쿠'],
+    ['김부장','나도 그 웹툰 좋아한단다'],
+    ['김부장','아무튼 우리 민지좀 찾아줘라.'],
+    ['김부장','모자를 쓰고있을것 같구나'],
+    ['sys','김부장과의 인맥이 +1 증가했다',
+     {fn:()=>{ G.player.link=(G.player.link||0)+1; G.flags.bossQuest=true; SFX.get(); saveGame(true); }}],
+  ]);
+}
+/* 딸을 찾았다고 알린 뒤 : 김부장이 따라나선다 */
+function bossFollow(){
+  say([
+    ['김부장','내 딸을 벌써 찾았다고?'],
+    ['김부장','아이고.. 이를 어떻게 보답해야 할지..'],
+    ['한철','따님 얼굴이 많이 삭으셨어요'],
+    ['한철','빨리 보러가셔야 될겁니다'],
+    ['김부장','안내해다오'],
+    ['sys','김부장이 동료가 되었다',
+     {fn:()=>{ G.flags.bossComing=true; SFX.get(); saveGame(true); }}],
+  ]);
+}
+/* 사기꾼(민지) 쪽 */
+function minjiFound(){
+  say([
+    ['사기꾼','너 뭐야'],
+    ['한철','혹시 주변에 여자아이 못봤나요?'],
+    ['사기꾼','여자아이는 못봤는데'],
+    ['한철','이름이 민지에요'],
+    ['사기꾼','그거 난데'],
+    ['한철','?'],
+    ['사기꾼','왜'],
+    ['한철','아버님께서 찾으셔요'],
+    ['사기꾼','아버지? 우리 아버지가?'],
+    ['한철','불러드릴까요?'],
+    ['사기꾼','그래'],
+    ['sys','김부장에게 알리러 가자',
+     {fn:()=>{ G.flags.minjiFound=true; saveGame(true); }}],
+  ]);
+}
+function minjiReunion(){
+  say([
+    ['사기꾼','아이고 아버지'],
+    ['김부장','민지야!'],
+    ['사기꾼','아버지ㅠㅠㅠㅠ'],
+    ['김부장','흐흑.. 민지야.. 어디갔었니..'],
+    ['한철','(무슨 사연이 있어서 딸이 사기꾼이 되었는지는 모르겠지만 아무튼 재회해서 다행이다)'],
+    ['사이비 신도','뭐? 여자였어?',{close:'사이비 신도'}],
+    ['사기꾼','깝치지 마라'],
+    ['사기꾼','니가 뭔데'],
+    ['사이비 신도','어흐어흐'],
+    ['사이비 신도','108배 하러 가실'],
+    ['사기꾼','꺼져라'],
+    ['사기꾼','니 ㅈㄴ 못생김'],
+    ['사이비 신도','힝..'],
+    ['한철','(저 아저씨도 참 딱하다)'],
+    ['sys','민지와 김부장이 재회했다',
+     {fn:()=>{ G.flags.minjiDone=true; G.flags.bossComing=false; SFX.get(); saveGame(true); }}],
+  ]);
+}
+
+/* =========================================================================
    마을 사람들 — 들어올 때마다 다른 자리에 서 있다
    ========================================================================= */
 function placeVillagers(){
   const R=ROOMS.village; if(!R) return;
-  const rx=()=>Math.round(rand(140,VILLAGE_W-200));
-  for(const n of R.npcs) if(n.roam){
-    n.x=rx(); n.y=Math.round(rand(ROAD_Y+20,ROAD_Y+ROAD_H-26));
+  const under=(x)=>Math.abs(x-BR_X)<110;          // 육교 밑은 비워 둔다
+  const rx=()=>{ let v; let n=0; do{ v=Math.round(rand(140,VILLAGE_W-220)); }while(under(v)&&n++<20); return v; };
+  const used=[];
+  const spread=()=>{ let v; let n=0;
+    do{ v=rx(); }while(used.some(u=>Math.abs(u-v)<150)&&n++<20);
+    used.push(v); return v; };
+  const free=BENCHES.slice();
+  const sit=(n)=>{
+    if(!free.length) return false;
+    const bx=free.splice(rint(0,free.length-1),1)[0];
+    n.x=bx+BENCH_W/2; n.y=BENCH_Y+2; n.sit=true; n.dir='down';
+    used.push(n.x); return true;
+  };
+  const roamers=R.npcs.filter(n=>n.roam&&(!n.when||n.when()));
+  for(const n of roamers) n.sit=false;
+  // 벤치 전용 주민을 먼저 앉힌다
+  for(const n of roamers) if(n.bench) sit(n);
+  for(const n of roamers){
+    if(n.sit) continue;
+    if(Math.random()<0.35 && sit(n)) continue;
+    n.x=spread();
+    const r=Math.random();
+    n.y = r<0.55 ? Math.round(rand(ROAD_Y+20,ROAD_Y+ROAD_H-26))     // 길 위
+        : r<0.80 ? Math.round(rand(ROAD_Y+ROAD_H+12,ROAD_Y+ROAD_H+34)) // 아래쪽 잔디
+                 : Math.round(rand(ROAD_Y-34,ROAD_Y-12));            // 위쪽 잔디
   }
   const car=R.objs.find(o=>o.name==='주차된 자동차');
-  if(car){ car.x=rx(); car.y=ROAD_Y+ROAD_H-40; }
+  if(car){ car.x=spread(); car.y=ROAD_Y+ROAD_H-42; }
 }
 
 /* ---------- 가로등 ---------- */
@@ -4363,9 +4894,16 @@ function bossTalk(){
     ]);
     return;
   }
+  if(G.flags.minjiDone){
+    say([['김부장','자네 덕에 딸을 찾았네'],['한철','다행이에요'],['김부장','다행이면 다행이지ㅋ'],['한철','...']]);
+    return;
+  }
+  if(G.flags.minjiFound&&!G.flags.bossComing){ bossFollow(); return; }
+  if((G.flags.jokes||0)>=5&&!G.flags.bossQuest){ bossReveal(); return; }
   bossJoke();
 }
 function bossJoke(){
+  G.flags.jokes=(G.flags.jokes||0)+1;
   const j=DAD_JOKES[rint(0,DAD_JOKES.length-1)];
   const tell=()=>say([
     ['김부장',j[0]],
@@ -4562,28 +5100,25 @@ function callJeomsun(){
     say([['한철','밭이다.'],['점순이','밟지 마라'],['한철','네']]);
     return;
   }
-  const r=Math.random();
-  if(r<0.15){ jeomFound(); return; }
-  if(r<0.25){ waspAttack(); return; }
+  if(Math.random()<0.15){ jeomFound(); return; }
   say(CALL_MISS[rint(0,CALL_MISS.length-1)]);
 }
 function waspAttack(){
   say([
-    ['한철','점순아!!!!!!!!!',{shake:0.3}],
-    ['','(부스럭)'],
-    ['한철','어? 뭐 나온다'],
+    ['한철','점순아!!!!',{shake:0.3}],
+    ['한철','설마 말벌집에 있나'],
     ['','(웅웅웅웅웅웅웅웅)',{shake:0.5}],
-    ['한철','저거 벌집인데'],
-    ['한철','저거 벌집이잖아'],
-    ['말벌','남의 집 앞에서 소리지르지 마라'],
-    ['한철','죄송합ㄴ'],
-    ['','(퍽)',{shake:1.0,sfx:'slap',flash:0.5,stars:true,down:true}],
+    ['말벌','남의집 앞에서 소리지르지 마라'],
+    ['한철','죄송합니ㄷ'],
+    ['말벌','그럼 죽어'],
+    ['','(말벌이 한철이를 쐈다)',{shake:1.0,sfx:'slap',flash:0.5,stars:true,down:true}],
+    ['한철','크악'],
   ],()=>killPlayer('wasp'));
 }
 function jeomFound(){
   say([
     ['한철','점순아!!!!!!!!!'],
-    ['','(사각사각)'],
+    ['','(사각사각)',{fn:()=>{ G.flags.jeomOut=true; }}],
     ['점순이','응?'],
     ['점순이','뭐야. 여기 어떻게 왔어'],
     ['한철','찾았다!'],
@@ -4666,6 +5201,10 @@ function riverCross(){
   ]);
 }
 function swindlerTalk(){
+  if(G.flags.bossComing){ minjiReunion(); return; }
+  if(G.flags.minjiDone){ say([['사기꾼','고맙다'],['한철','아니에요'],['사기꾼','그래도 뱃삯은 받는다'],['한철','네?']]); return; }
+  if(G.flags.bossQuest&&!G.flags.minjiFound){ minjiFound(); return; }
+  if(G.flags.minjiFound){ say([['사기꾼','아버지는?'],['한철','모시고 올게요'],['사기꾼','빨리 와라']]); return; }
   say([
     ['사기꾼','멈춰라'],
     ['한철','왜요?'],
@@ -5429,7 +5968,12 @@ const ROOMS={
       {id:'beggar',kind:'beggar',x:1700,y:ROAD_Y+66,dir:'right',roam:true,label:'거지',
        when:()=>!G.flags.beggarDone,
        talk:()=>{ beggarTalk(); return null; }},
-    ],
+    ].concat(TOWN.map((t,i)=>({
+      id:t.id, kind:t.kind, x:300+i*160, y:ROAD_Y+30+((i*17)%56), dir:(i%2)?'left':'right',
+      roam:true, bench:!!t.bench,
+      when:()=>townHere(t.id),
+      talk:()=>{ townTalk(t); return null; }
+    }))),
     triggers:(function(){
       const t=[];
       for(const inf of INFRA){
@@ -5697,7 +6241,7 @@ const ROOMS={
   /* ===== HC바이오 뒷문 ===== */
   hcback:{
     name:'HC바이오 뒷문', bg:bgHcBack, outdoor:true, noCompanion:true,
-    walls:[{x:0,y:0,w:640,h:176},{x:0,y:304,w:640,h:176},{x:0,y:176,w:14,h:128}],
+    walls:[{x:0,y:0,w:640,h:176},{x:0,y:304,w:640,h:176}],
     objs:[
       {x:240,y:86,w:160,h:96,name:'뒷문',act:hcBackDoor},
       {x:150,y:236,w:44,h:34,name:'키카드',act:hcBackKey},
@@ -5947,11 +6491,10 @@ const ROOMS={
              ['한철','전원이 아예 안 들어오네'],
              ['한철','그리고 케이블이 다 삭았는데 이거']]);
       }},
-      {x:378,y:116,w:48,h:76,name:'말벌집',act:()=>say([
-        ['한철','저거 벌집 아니냐'],['한철','건드리지 말자'],['한철','조용히 하고']])},
+      {x:378,y:116,w:48,h:76,name:'말벌집',act:waspAttack},
     ],
-    npcs:[{id:'jeom3',kind:'jeomsun',x:296,y:300,dir:'left',
-           when:()=>!!G.flags.foundJeom && !hasCompanion(),
+    npcs:[{id:'jeom3',kind:'jeomsun',x:232,y:326,dir:'right',
+           when:()=>!!G.flags.jeomOut && !hasCompanion(),
            talk:()=>[['점순이','왜'],['한철','아니 그냥'],['점순이','그럼 가만히 있어']]}],
     exits:[{x:268,y:466,w:104,h:14,to:'trail',tx:320,ty:40},
            {x:266,y:0,w:108,h:14,to:'__NOTICE__',
@@ -6027,11 +6570,11 @@ function enterRoom(name,tx,ty){
   G.player.x=tx!==undefined?tx:R.start.x;
   G.player.y=ty!==undefined?ty:R.start.y;
   G.player.down=false; G.player.hopT=0;
-  G.exitCd=0.6; G.wait=null; G.timer=null; G.autoWalk=null; G.rush=null; G.dirtWalk=0; G.tvBlock=0;
+  G.exitCd=0.6; G.exitBlock=null; G.wait=null; G.timer=null; G.autoWalk=null; G.rush=null; G.dirtWalk=0; G.tvBlock=0;
   G.walkIn=null; G.doorOpen=0; G.hidePlayer=false; G.playerFade=0; G.actors=[]; G.walkers=[]; G.closeUp=null; G.siren=0;
   placeCompanion(); initWalkers();
   if(name==='cross') placeRock();
-  if(name==='village'){ placeVillagers(); G.grassT=0; }
+  if(name==='village'){ pickTownOut(); placeVillagers(); G.grassT=0; }
   if(name==='bank') initBankQueue(); else { G.bankQ=null; G.bankLeaver=null; }
   if(R.triggers) for(const t of R.triggers) if(t.repeat) G.flags['trig_'+t.id]=false;
   if(name==='home'&&!G.flags.opening){
@@ -6049,6 +6592,7 @@ function enterRoom(name,tx,ty){
   }
   if(name==='void'){ setTimeout(()=>say([['한철','...'],['한철','여긴 아무것도 없는데']]),400); }
   if(name==='cult') setTimeout(cultRoom,360);
+  if(name==='deep') unlockChapter3();
   if(name==='deep'&&!G.flags.sawDeep){
     G.flags.sawDeep=true;
     setTimeout(()=>say([
@@ -6075,8 +6619,10 @@ function enterRoom(name,tx,ty){
     G.flags.jailHi=true;
     setTimeout(()=>say([['sys','철창에 갇혔다'],['한철','...'],['한철','여기서 어떻게 나가지']]),320);
   }
-  saveGame(true);
+  if(!NOSAVE[name]) saveGame(true);
 }
+/* 여기서 저장하면 불러올 때마다 같은 곳으로 돌아와 갇힌다 */
+const NOSAVE={ void:1, cult:1 };
 function killPlayer(id){
   G.player.hp=0; G.player.down=true; SFX.thud();
   setTimeout(()=>startEnding(id),500);
@@ -6235,15 +6781,19 @@ function updateField(dt){
     }
   }
 
-  // 출구
-  if(G.exitCd<=0){
-    for(const ex of R.exits){
-      if(aabb({x:p.x-p.w/2,y:p.y-p.h/2,w:p.w,h:p.h},ex)){
-        if(ex.guard&&!ex.guard()){ G.exitCd=1.2; return; }
-        if(ex.to==='__NOTICE__'){ fadeTo(()=>enterRoom('void'),1.6); return; }
-        const to=ex.to,tx=ex.tx,ty=ex.ty;
-        fadeTo(()=>enterRoom(to,tx,ty)); return;
-      }
+  /* 출구.
+     guard 가 막은 출구는 그 자리에서 벗어나기 전까지 다시 묻지 않는다.
+     안 그러면 방향키를 누른 채로 서 있을 때 쿨다운마다 대사가 다시 뜬다 */
+  {
+    const pb={x:p.x-p.w/2,y:p.y-p.h/2,w:p.w,h:p.h};
+    let on=null;
+    for(const ex of R.exits) if(aabb(pb,ex)){ on=ex; break; }
+    if(!on) G.exitBlock=null;
+    else if(G.exitCd<=0 && G.exitBlock!==on){
+      if(on.guard&&!on.guard()){ G.exitBlock=on; G.exitCd=0.5; return; }
+      if(on.to==='__NOTICE__'){ fadeTo(()=>enterRoom('void'),1.6); return; }
+      const to=on.to,tx=on.tx,ty=on.ty;
+      fadeTo(()=>enterRoom(to,tx,ty)); return;
     }
   }
 }
@@ -6562,7 +7112,7 @@ function drawEndSkipHint(){
   ctx.globalAlpha=1;
 }
 function drawEnding(){
-  const E=G.ending;
+  const E=G.ending; if(!E) return;   // 가짜 엔딩에서 막 돌아온 프레임
   if(E.phase==='fadeout'){
     ctx.drawImage(shot,0,0);
     ctx.globalAlpha=clamp(E.t/(E.fake?1.1:1.3),0,1); rect(0,0,W,H,'#000'); ctx.globalAlpha=1;
@@ -6690,8 +7240,58 @@ function drawNotice(){
 /* =========================================================================
    버전 / 패치노트
    ========================================================================= */
-const VERSION='2.0';
+const VERSION='2.3.1';
 const PATCH_NOTES=[
+  { ver:'2.3.1', date:'2026-08-27', title:'막힌 출구 대사 반복 수정', lines:[
+    '[버그] 못 들어가는 곳에 방향키를 누른 채로 서 있으면 대사가 계속 다시 뜨던 문제 수정',
+    '   막힌 출구는 그 자리에서 벗어나기 전까지 다시 묻지 않습니다',
+    '   벗어났다 다시 오면 정상적으로 한 번 더 물어봅니다',
+    '   은행 휴무 · 단서 부족 · 양지바른 터 · 인프라 2곳 전부 해당됐습니다',
+  ]},
+  { ver:'2.3', date:'2026-08-27', title:'주민 정리 · 두 번째 대사', lines:[
+    '마을이 북적여서 주민을 줄였습니다 — 명단 16명 중 매번 11명만 길에 나옵니다',
+    '   마을에 들어올 때마다 다시 뽑으므로, 올 때마다 다른 사람이 서 있습니다',
+    '   이야기에 걸린 넷(떨고있는 · 수군대는 · 강가 · 벤치)은 항상 나옵니다',
+    '주민마다 두 번째 대사가 생겼습니다',
+    '   처음엔 자기 이야기, 두 번째는 그 뒷이야기, 그 다음부터는 기본 대사',
+    '   기본 대사도 하나에서 일곱 가지로 늘려 매번 다르게 나옵니다',
+    '   두 번째 대사 중에 산 텃밭 · 강가 사기꾼 같은 힌트가 섞여 있습니다',
+  ]},
+  { ver:'2.2', date:'2026-08-24', title:'마을 주민 15명 · 민지를 찾아서', lines:[
+    '[버그] 미완성 룸에서 [마지막 세이브로] 를 눌러도 계속 그 방으로 돌아오던 문제 수정',
+    '   미완성 룸과 교단에서는 자동 저장을 하지 않습니다',
+    '[버그] HC바이오 뒷문에서 육교로 돌아갈 수 없던 문제 수정 (벽이 출구를 막고 있었습니다)',
+    '[버그] 마을에 주차된 자동차가 안 보이던 문제 수정 (배경에 안 그리고 있었습니다)',
+    '육교 폭을 줄이고, 육교 밑에는 사람도 차도 서지 않게 했습니다',
+    '가로등 초상화를 진짜 가로등으로 바꿨습니다',
+    '텃밭에서 부를 때 나오던 말벌을 없앴습니다. 대신 말벌집을 조사하면 말벌 엔딩',
+    '철창에서 나온 뒤 경찰서 창구에서 압수당한 삽을 되찾을 수 있습니다',
+    '챕터 [HC바이오] 추가 — 뒷문에서 키카드를 주우면 열립니다',
+    '마을에 주민 15명 추가 — 대부분 쓸모없는 말을 합니다',
+    '   떨고있는 주민이 김부장을 조심하라고 알려줍니다',
+    '   실종자 이야기를 하는 주민이 둘 있습니다',
+    '김부장에게 아재개그를 다섯 번 들으면 진짜 이야기를 꺼냅니다 (김부장 인맥 +1)',
+    '   사기꾼이 사실 민지입니다. 김부장을 데려가면 재회합니다',
+    '도로 가변에 벤치가 생겼습니다. 주민들이 확률적으로 앉아 있습니다',
+    '   주민은 길 위뿐 아니라 양옆 잔디에도 서 있습니다',
+  ]},
+  { ver:'2.1', date:'2026-08-24', title:'세이브 4칸 · 모바일 가로 모드', lines:[
+    '세이브 칸이 4개로 늘었습니다',
+    '   일시정지(ESC)에서 S 를 누르거나 [저장하기] 를 고르면 저장 창이 열립니다',
+    '   이미 쓴 칸은 한 번 더 눌러야 덮어씁니다',
+    '   메뉴의 [이어하기] 도 칸을 골라 불러옵니다. 예전 세이브는 1번 칸으로 옮겨집니다',
+    '   자동 저장은 마지막으로 쓴 칸에 계속 들어갑니다',
+    '챕터 [깊은 산] 추가 — 산 깊은 곳에 한 번 올라가 보면 열립니다',
+    '모바일이 가로 모드로 바뀌었습니다',
+    '   게임 화면이 전체를 채우고, 조작 버튼이 그 위에 반투명하게 얹힙니다',
+    '   대사 중에는 버튼이 사라지고 화면 아무 데나 탭하면 넘어갑니다',
+    '   세로로 들고 있으면 돌리라고 알려줍니다',
+    '[버그] 점순이 가짜 엔딩에서 ENTER 를 누르면 게임이 멈추던 문제 수정',
+    '   엔딩 화면이 사라진 프레임에 그리기가 한 번 더 돌아서 터졌습니다',
+    '점순이를 찾으면 텃밭에 실제로 서 있습니다',
+    '지나가던 스님 스프라이트 추가',
+    '[조정] HC바이오 뒷문 암호는 아직 어디에도 없습니다 (후반 전개용)',
+  ]},
   { ver:'2.0', date:'2026-08-24', title:'마을 사람들 · HC바이오', lines:[
     '마을에 말 걸 수 있는 사람들이 생겼습니다. 들어올 때마다 다른 자리에 서 있습니다',
     '   개미 — 작다고 무시하면 개미 엔딩. 잔디를 계속 밟아도 마찬가지입니다',
@@ -6957,7 +7557,7 @@ const PATCH_NOTES=[
 
 function menuItems(){
   const out=[{k:'new',label:'\uc0c8\ub85c \uc2dc\uc791'}];
-  if(readSave()) out.push({k:'load',label:'\uc774\uc5b4\ud558\uae30'});
+  if(slotCount()) out.push({k:'load',label:'이어하기  ('+slotCount()+'/'+SLOTS+')'});
   if(anyChapterOpen()) out.push({k:'chapters',label:'\ucc55\ud130 \uc120\ud0dd'});
   out.push({k:'dex',label:'\uc5d4\ub529 \ub3c4\uac10  ('+dexCount()+'/'+ENDING_ORDER.length+')'});
   out.push({k:'patch',label:'\ud328\uce58\ub178\ud2b8'});
@@ -7007,8 +7607,10 @@ function updatePause(dt){
     else if(g==='n'){ SFX.menu(); G.pauseConfirm=false; }
     return;
   }
-  if(upHit())   { G.pauseSel=(G.pauseSel+n-1)%n; SFX.menu(); }
-  if(downHit()) { G.pauseSel=(G.pauseSel+1)%n;   SFX.menu(); }
+  /* ESC + S : 바로 세이브 창으로 (아래 이동은 ↓ 로) */
+  if(hit('KeyS')){ SFX.ok(); openSlots('save','pause'); return; }
+  if(upHit())         { G.pauseSel=(G.pauseSel+n-1)%n; SFX.menu(); }
+  if(hit('ArrowDown')){ G.pauseSel=(G.pauseSel+1)%n;   SFX.menu(); }
   let go=null;
   for(let i=0;i<n;i++) if(clickIn(btns[i])){ G.pauseSel=i; go=btns[i].k; }
   if(click) click=null;
@@ -7016,7 +7618,7 @@ function updatePause(dt){
   if(okHit()) go=btns[G.pauseSel].k;
   if(!go) return;
   if(go==='resume'){ SFX.menu(); G.scene='field'; }
-  else if(go==='save'){ SFX.ok(); saveGame(); }
+  else if(go==='save'){ SFX.ok(); openSlots('save','pause'); }
   else if(go==='set'){ SFX.ok(); G.scene='settings'; G.setSel=0; G.setFrom='pause'; }
   else if(go==='quit'){ SFX.menu(); G.pauseConfirm=true; G.pauseYes=false; }
 }
@@ -7176,7 +7778,7 @@ function updateMenu(dt){
   if(!go) return;
   SFX.ok();
   if(go==='new') fadeTo(startNewGame);
-  else if(go==='load'){ const s=readSave(); if(s) fadeTo(()=>applySave(s)); }
+  else if(go==='load'){ openSlots('load','menu'); }
   else if(go==='chapters'){ openChapters(); }
   else if(go==='dex'){ G.scene='dex'; G.dexScroll=0; }
   else if(go==='patch'){ G.scene='patch'; G.patchScroll=0; }
@@ -7233,6 +7835,92 @@ function drawMenu(){
   rect(90,420,460,24,'#0e0e16'); frameR(90,420,460,24,'#3a2c2c',1);
   text('본 스토리에는 일부 비속어가 섞여있습니다.',320,426,11,'#b88a90','center');
   text('ver '+VERSION,320,458,10,'#454554','center');
+}
+
+/* =========================================================================
+   세이브 슬롯 (4칸)
+   ========================================================================= */
+const SLOT_TOP=96, SLOT_STEP=74, SLOT_H=64;
+function openSlots(mode,from){
+  G.scene='slots'; G.slotMode=mode; G.slotFrom=from||'menu';
+  G.slotSel=CUR_SLOT; G.slotConfirm=-1; SFX.menu();
+}
+function slotRows(){
+  const out=[];
+  for(let i=0;i<SLOTS;i++) out.push({ i, s:readSlot(i), x:80, y:SLOT_TOP+i*SLOT_STEP, w:480, h:SLOT_H });
+  return out;
+}
+function slotBack(){ return {x:230,y:428,w:180,h:32}; }
+function slotWhen(t){
+  if(!t) return '';
+  const d=new Date(t), z=n=>(n<10?'0':'')+n;
+  return (d.getMonth()+1)+'/'+d.getDate()+' '+z(d.getHours())+':'+z(d.getMinutes());
+}
+function closeSlots(){
+  const f=G.slotFrom;
+  G.scene = (f==='pause') ? 'pause' : 'menu';
+  if(f!=='pause'){ G.menu=G.menu||{sel:0}; }
+}
+function updateSlots(dt){
+  const rows=slotRows(), n=rows.length;
+  if(upHit())  { G.slotSel=(G.slotSel+n-1)%n; G.slotConfirm=-1; SFX.menu(); }
+  if(downHit()){ G.slotSel=(G.slotSel+1)%n;   G.slotConfirm=-1; SFX.menu(); }
+  const back=slotBack();
+  if(hit('Escape')||clickIn(back)){ click=null; SFX.menu(); closeSlots(); return; }
+  let go=-1;
+  for(const r of rows) if(clickIn(r)){ G.slotSel=r.i; go=r.i; }
+  if(click) click=null;
+  if(okHit()) go=G.slotSel;
+  if(go<0) return;
+  const r=rows[go];
+  if(G.slotMode==='load'){
+    if(!r.s){ SFX.thud(); toast('비어 있는 칸입니다'); return; }
+    SFX.ok(); setSlot(r.i);
+    const s=r.s;
+    fadeTo(()=>applySave(s));
+    return;
+  }
+  // 저장 : 이미 쓴 칸이면 한 번 더 눌러야 덮어쓴다
+  if(r.s && G.slotConfirm!==r.i){ G.slotConfirm=r.i; SFX.menu(); return; }
+  SFX.ok(); G.slotConfirm=-1;
+  saveGame(false,r.i);
+  closeSlots();
+}
+function drawSlots(){
+  const load=(G.slotMode==='load');
+  rect(0,0,W,H,'#06060b');
+  for(let i=0;i<60;i++){ const x=(i*137)%W,y=((i*211)+G.t*8)%H;
+    ctx.globalAlpha=.28; rect(x,y,2,2,'#26262f'); ctx.globalAlpha=1; }
+  text(load?'불 러 오 기':'저 장 하 기',320,30,24,'#ffe14d','center','bold');
+  text(load?'이어서 할 칸을 고르세요':'저장할 칸을 고르세요',320,64,12,'#8a90a4','center');
+  const rows=slotRows();
+  for(const r of rows){
+    const on=(G.slotSel===r.i), cur=(CUR_SLOT===r.i), has=!!r.s;
+    rect(r.x,r.y,r.w,r.h, on?'#1c1a10':(has?'#101018':'#0a0a0e'));
+    frameR(r.x,r.y,r.w,r.h, on?'#ffe14d':(has?'#3a3a48':'#26262f'), on?3:2);
+    // 칸 번호
+    rect(r.x+12,r.y+14,36,36, has?'#1c1a10':'#131318');
+    frameR(r.x+12,r.y+14,36,36, has?'#ffe14d':'#33333f',2);
+    text(String(r.i+1),r.x+30,r.y+21,17, has?'#ffe14d':'#4a4a58','center','bold');
+    if(has){
+      const s=r.s;
+      text(ROOMS[s.room]?ROOMS[s.room].name:'?', r.x+60,r.y+10,16, on?'#ffe14d':'#e0e0e8','left','bold');
+      text('플레이 '+fmtTime(s.play||0)+'   ·   HP '+hpText(s.hp)+' / '+s.maxhp,
+           r.x+60,r.y+32,11,'#9aa0b0','left');
+      text('저장 '+slotWhen(s.time), r.x+60,r.y+47,11,'#6a7080','left');
+      if(cur) text('현재 칸', r.x+r.w-14, r.y+10,11,'#8adca0','right','bold');
+    }else{
+      text('비어 있음', r.x+60,r.y+16,16,'#4a4a58','left','bold');
+      text(load?'불러올 기록이 없습니다':'여기에 저장할 수 있습니다', r.x+60,r.y+38,11,'#3a3a48','left');
+    }
+    if(!load && G.slotConfirm===r.i)
+      text('한 번 더 누르면 덮어씁니다', r.x+r.w-14, r.y+44,11,'#ff9a6a','right','bold');
+    if(on&&Math.floor(G.t*3)%2===0) text('▶', r.x+r.w-22, r.y+22,15,'#ffe14d','center');
+  }
+  text('↑↓ 선택 · ENTER '+(load?'불러오기':'저장')+' · ESC 뒤로',320,400,11,'#55556a','center');
+  const back=slotBack();
+  rect(back.x,back.y,back.w,back.h,'#0c0c14'); frameR(back.x,back.y,back.w,back.h,'#8a8a9a',3);
+  text('돌아가기',back.x+back.w/2,back.y+7,15,'#c8c8d8','center','bold');
 }
 
 /* 챕터 선택 화면 — CHAPTERS 표를 그대로 보여준다 */
@@ -7342,37 +8030,41 @@ function vText(s,x,y,size,color,weight){
   vctx.fillText(s,x,y);
 }
 function drawMobileUI(){
-  vRect(0,0,MW,MH,'#08080e');
-  const ga=gameArea();
-  vFrame(ga.x-2,ga.y-2,ga.w+4,ga.h+4,'#2a2a38',2);
-  // 조작판 배경
-  vRect(0,ga.y+ga.h+10,MW,MH-(ga.y+ga.h+10),'#0d0d15');
-  vRect(0,ga.y+ga.h+10,MW,2,'#22222e');
-  // 십자키 받침
-  vctx.globalAlpha=.5;
-  vRect(DP.cx-DP.g-DP.s/2-6,DP.cy-DP.s/2-6,DP.g*2+DP.s+12,DP.s+12,'#12121c');
-  vRect(DP.cx-DP.s/2-6,DP.cy-DP.g-DP.s/2-6,DP.s+12,DP.g*2+DP.s+12,'#12121c');
-  vctx.globalAlpha=1;
+  // 세로로 들고 있으면 돌리라고 알려준다
+  if(innerHeight>innerWidth*1.05){
+    vctx.globalAlpha=.82; vRect(0,0,MW,MH,'#05050a'); vctx.globalAlpha=1;
+    vText('화면을 가로로 돌려주세요',MW/2,MH/2-14,20,'#ffe14d','bold');
+    vText('가로 모드에서만 조작 버튼이 나옵니다',MW/2,MH/2+16,12,'#8a90a4');
+    return;
+  }
   for(const b of MOB_BTNS){
+    if(!mobShow(b)) continue;
     const on=touchKeys.has(b.key);
+    vctx.globalAlpha=on?0.80:0.30;
     if(b.kind==='c'){
       vctx.beginPath(); vctx.arc(b.cx,b.cy,b.r,0,6.2832);
-      vctx.fillStyle=on?'#3a3418':'#14141f'; vctx.fill();
-      vctx.lineWidth=3; vctx.strokeStyle=on?'#ffe14d':'#4a4a5c'; vctx.stroke();
-      vText(b.label,b.cx,b.cy,b.big?18:12,on?'#ffe14d':'#b8b8c8','bold');
+      vctx.fillStyle=on?'#3a3418':'#0d0d16'; vctx.fill();
+      vctx.lineWidth=3; vctx.strokeStyle=on?'#ffe14d':'#c8c8d8'; vctx.stroke();
     }else{
-      vRect(b.x,b.y,b.w,b.h,on?'#3a3418':'#14141f');
-      vFrame(b.x,b.y,b.w,b.h,on?'#ffe14d':'#4a4a5c',3);
-      vText(b.label,b.x+b.w/2,b.y+b.h/2,b.size||24,on?'#ffe14d':'#b8b8c8','bold');
+      vRect(b.x,b.y,b.w,b.h,on?'#3a3418':'#0d0d16');
+      vFrame(b.x,b.y,b.w,b.h,on?'#ffe14d':'#c8c8d8',3);
     }
+    vctx.globalAlpha=on?1:0.62;
+    const cx=(b.kind==='c')?b.cx:b.x+b.w/2, cy=(b.kind==='c')?b.cy:b.y+b.h/2;
+    vText(b.label,cx,cy,b.big?17:(b.size||12),on?'#ffe14d':'#e8e8f0','bold');
+    vctx.globalAlpha=1;
   }
-  vText('모바일 모드 · 환경설정에서 끌 수 있음',MW/2,MH-12,10,'#3a3a48');
+  // 대사 중에는 버튼을 다 숨기고 안내만 띄운다
+  if(G.scene==='field'&&(G.dlg||G.wait)&&Math.floor(G.t*1.6)%2===0){
+    vctx.globalAlpha=.5;
+    vText('화면을 탭하면 넘어갑니다',MW/2,MH-12,11,'#c8c8d8');
+    vctx.globalAlpha=1;
+  }
 }
 function present(){
-  if(!MOBILE){ vctx.clearRect(0,0,W,H); vctx.drawImage(cv,0,0); return; }
-  drawMobileUI();
-  const ga=gameArea();
-  vctx.drawImage(cv,0,0,W,H,ga.x,ga.y,ga.w,ga.h);
+  vctx.clearRect(0,0,VWid(),VHei());
+  vctx.drawImage(cv,0,0,W,H,0,0,VWid(),VHei());
+  if(MOBILE) drawMobileUI();
 }
 
 /* =========================================================================
@@ -7412,6 +8104,7 @@ function loop(t){
   switch(G.scene){
     case 'menu':     if(!blocked) updateMenu(dt);     drawMenu();     break;
     case 'chapters': if(!blocked) updateChapters(dt); drawChapters(); break;
+    case 'slots':    if(!blocked) updateSlots(dt);    drawSlots();    break;
     case 'dex':    if(!blocked) updateDex(dt);    drawDex();    break;
     case 'patch':  if(!blocked) updatePatch(dt);  drawPatch();  break;
     case 'settings': if(!blocked) updateSettings(dt); drawSettings(); break;
@@ -7422,7 +8115,7 @@ function loop(t){
       updateParts(dt);
       drawField(G.player.down||G.player.hp<=0);
       break;
-    case 'ending': updateEnding(dt); drawEnding(); break;
+    case 'ending': updateEnding(dt); if(G.ending) drawEnding(); break;
   }
   if(G.fade>0){ ctx.globalAlpha=G.fade; rect(0,0,W,H,'#000'); ctx.globalAlpha=1; }
   if(G.toast && G.scene!=='field'){
